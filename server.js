@@ -198,7 +198,7 @@ Acesse o seu painel para preparar o envio!
     throw error; 
   }
 }
-// ROTA PARA CALCULAR FRETE (MELHOR ENVIO)
+// ROTA PARA CALCULAR FRETE (FILTRADO APENAS CORREIOS)
 app.post("/calcular-frete", async (req, res) => {
   try {
     const { cepDestino } = req.body;
@@ -206,7 +206,7 @@ app.post("/calcular-frete", async (req, res) => {
     const response = await axios.post(
       "https://melhorenvio.com.br/api/v2/me/shipment/calculate",
       {
-        from: { postal_code: "76913430" }, // COLOQUE AQUI O SEU CEP DE ORIGEM
+        from: { postal_code: "76913430" }, // Seu CEP de Ji-Paraná
         to: { postal_code: cepDestino },
         products: [
           { id: "produto", width: 15, height: 15, length: 15, weight: 0.5, insurance_value: 50, quantity: 1 }
@@ -221,8 +221,14 @@ app.post("/calcular-frete", async (req, res) => {
       }
     );
 
-    res.json(response.data);
+    // FILTRO: Retorna apenas PAC (ID 1) e SEDEX (ID 2)
+    const fretesFiltrados = response.data.filter(opcao => 
+      opcao.id === 1 || opcao.id === 2 || opcao.id === "1" || opcao.id === "2"
+    );
+
+    res.json(fretesFiltrados);
   } catch (error) {
+    console.error("Erro na API do Melhor Envio:", error.response?.data || error.message);
     res.status(500).json({ erro: "Erro ao calcular frete" });
   }
 });
@@ -233,6 +239,7 @@ app.post("/calcular-frete", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}...`);
 });
+
 
 
 
