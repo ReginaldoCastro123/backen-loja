@@ -112,49 +112,44 @@ app.post("/webhook", async (req, res) => {
 });
 
 // ==============================
-// ENVIAR EMAIL
+// ENVIAR EMAIL (PLANO B - RESEND)
 // ==============================
 async function enviarEmail(produto, valor) {
   try {
-    console.log("Conectando ao servidor do Gmail...");
-    
-    /// Configuração usando a porta 587 (Alternativa para furar o bloqueio do Render)
-    const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false, // IMPORTANTE: Para a porta 587, isso tem que ser false
-      requireTLS: true,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+    console.log("Conectando ao Resend (Rota anti-bloqueio do Render)...");
+
+    const response = await axios.post(
+      "https://api.resend.com/emails",
+      {
+        // ATENÇÃO: No plano grátis, o "from" TEM QUE SER exatamente esse abaixo:
+        from: "Notificacao Loja <onboarding@resend.dev>", 
+        // Aqui vai o SEU e-mail que receberá os avisos
+        to: "farmafacil35@gmail.com", 
+        subject: "✅ Novo pedido pago!",
+        text: `Oba! Venda aprovada.\n\nProduto: ${produto}\nValor: R$ ${valor}`
       },
-      tls: {
-        rejectUnauthorized: false // Ajuda a evitar bloqueios de certificado na nuvem
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+          "Content-Type": "application/json"
+        }
       }
-    });
+    );
 
-    console.log("Disparando a mensagem...");
-    
-    const info = await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: process.env.EMAIL_USER, // Enviando para você mesmo
-      subject: "✅ Novo pedido pago!",
-      text: `Oba! Venda aprovada.\n\nProduto: ${produto}\nValor: R$ ${valor}`
-    });
-
-    console.log("E-mail enviado com sucesso! ID da mensagem:", info.messageId);
+    console.log("E-mail enviado com sucesso via Resend! ID:", response.data.id);
     
   } catch (error) {
-    console.error("ERRO GRAVE AO ENVIAR O E-MAIL:", error.message);
-    // Repassa o erro para cima para o Webhook saber que falhou
+    // Mostra exatamente o porquê falhou, se der erro
+    console.error("ERRO GRAVE AO ENVIAR O E-MAIL (RESEND):", error.response?.data || error.message);
     throw error; 
   }
 }
 
 // ==============================
-// INICIAR O SERVIDOR (O QUE HAVIA SUMIDO!)
+// INICIAR O SERVIDOR
 // ==============================
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}...`);
 });
+
 
