@@ -147,3 +147,9 @@ async function enviarEmail(produto, valor) {
   }
 }
 
+// ==============================
+// INICIAR O SERVIDOR (O QUE HAVIA SUMIDO!)
+// ==============================
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}...`);
+});
