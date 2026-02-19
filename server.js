@@ -20,21 +20,23 @@ app.post("/criar-pagamento", async (req, res) => {
     const { produto, valor, cep, envio } = req.body;
 
     const response = await axios.post(
-      "https://api.mercadopago.com/v1/payments",
-      {
-        transaction_amount: Number(valor),
-        description: produto,
-        payment_method_id: "pix",
-        payer: {
-          email: "cliente@email.com"
-        }
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.MP_TOKEN}`
-        }
-      }
-    );
+  "https://api.mercadopago.com/v1/payments",
+  {
+    transaction_amount: Number(valor),
+    description: produto,
+    payment_method_id: "pix",
+    payer: {
+      email: "cliente@email.com"
+    },
+    notification_url: "https://backen-loja.onrender.com/webhook"
+  },
+  {
+    headers: {
+      Authorization: `Bearer ${process.env.MP_TOKEN}`,
+      "Content-Type": "application/json"
+    }
+  }
+);
 
     const pagamento = response.data;
 
@@ -44,9 +46,12 @@ app.post("/criar-pagamento", async (req, res) => {
         pagamento.point_of_interaction.transaction_data.qr_code_base64
     });
   } catch (error) {
-    console.error(error.response?.data || error);
-    res.status(500).json({ erro: "Erro ao criar pagamento" });
-  }
+  console.log("ERRO:", error.response?.data || error.message);
+  res.status(500).json({
+    erro: "Erro ao criar pagamento",
+    detalhe: error.response?.data || error.message
+  });
+    }
 });
 
 // ==============================
