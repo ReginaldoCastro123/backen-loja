@@ -198,6 +198,34 @@ Acesse o seu painel para preparar o envio!
     throw error; 
   }
 }
+// ROTA PARA CALCULAR FRETE (MELHOR ENVIO)
+app.post("/calcular-frete", async (req, res) => {
+  try {
+    const { cepDestino } = req.body;
+
+    const response = await axios.post(
+      "https://melhorenvio.com.br/api/v2/me/shipment/calculate",
+      {
+        from: { postal_code: "76900000" }, // COLOQUE AQUI O SEU CEP DE ORIGEM
+        to: { postal_code: cepDestino },
+        products: [
+          { id: "produto", width: 15, height: 15, length: 15, weight: 0.5, insurance_value: 50, quantity: 1 }
+        ]
+      },
+      {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${process.env.MELHOR_ENVIO_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    res.json(response.data);
+  } catch (error) {
+    res.status(500).json({ erro: "Erro ao calcular frete" });
+  }
+});
 
 // ==============================
 // INICIAR O SERVIDOR
@@ -205,6 +233,7 @@ Acesse o seu painel para preparar o envio!
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}...`);
 });
+
 
 
 
