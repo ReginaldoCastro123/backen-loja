@@ -206,7 +206,7 @@ app.post("/calcular-frete", async (req, res) => {
     const response = await axios.post(
       "https://melhorenvio.com.br/api/v2/me/shipment/calculate",
       {
-        from: { postal_code: "76900000" }, // COLOQUE AQUI O SEU CEP DE ORIGEM
+        from: { postal_code: "76913430" }, // COLOQUE AQUI O SEU CEP DE ORIGEM
         to: { postal_code: cepDestino },
         products: [
           { id: "produto", width: 15, height: 15, length: 15, weight: 0.5, insurance_value: 50, quantity: 1 }
@@ -233,6 +233,7 @@ app.post("/calcular-frete", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}...`);
 });
+
 
 
 
