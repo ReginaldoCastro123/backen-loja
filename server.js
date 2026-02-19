@@ -118,14 +118,18 @@ async function enviarEmail(produto, valor) {
   try {
     console.log("Conectando ao servidor do Gmail...");
     
-    // Configuração explícita (Evita o erro de Timeout no Render)
+    /// Configuração usando a porta 587 (Alternativa para furar o bloqueio do Render)
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
-      port: 465, // Porta segura padrão do Gmail
-      secure: true, 
+      port: 587,
+      secure: false, // IMPORTANTE: Para a porta 587, isso tem que ser false
+      requireTLS: true,
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
+      },
+      tls: {
+        rejectUnauthorized: false // Ajuda a evitar bloqueios de certificado na nuvem
       }
     });
 
@@ -153,3 +157,4 @@ async function enviarEmail(produto, valor) {
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}...`);
 });
+
