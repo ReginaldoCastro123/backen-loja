@@ -115,24 +115,35 @@ app.post("/webhook", async (req, res) => {
 // ENVIAR EMAIL
 // ==============================
 async function enviarEmail(produto, valor) {
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    }
-  });
+  try {
+    console.log("Conectando ao servidor do Gmail...");
+    
+    // Configuração explícita (Evita o erro de Timeout no Render)
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465, // Porta segura padrão do Gmail
+      secure: true, 
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
-    to: process.env.EMAIL_USER,
-    subject: "Novo pedido pago!",
-    text: `Produto: ${produto}\nValor: R$ ${valor}`
-  });
+    console.log("Disparando a mensagem...");
+    
+    const info = await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: process.env.EMAIL_USER, // Enviando para você mesmo
+      subject: "✅ Novo pedido pago!",
+      text: `Oba! Venda aprovada.\n\nProduto: ${produto}\nValor: R$ ${valor}`
+    });
+
+    console.log("E-mail enviado com sucesso! ID da mensagem:", info.messageId);
+    
+  } catch (error) {
+    console.error("ERRO GRAVE AO ENVIAR O E-MAIL:", error.message);
+    // Repassa o erro para cima para o Webhook saber que falhou
+    throw error; 
+  }
 }
-
-app.listen(PORT, () => {
-  console.log("Servidor rodando...");
-});
-
 
