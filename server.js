@@ -64,9 +64,20 @@ const response = await axios.post(
 // WEBHOOK MERCADO PAGO
 // ==============================
 app.post("/webhook", async (req, res) => {
-  try {
-    const paymentId = req.body.data.id;
+  // Esse JSON.stringify ajuda a mostrar o objeto inteiro nos logs do Render
+  console.log("CHEGOU ALGO NO WEBHOOK:", JSON.stringify(req.body, null, 2));
 
+  try {
+    // 1. Verificação de segurança: evita que o app "quebre" se o MP mandar um aviso vazio
+    if (!req.body || !req.body.data || !req.body.data.id) {
+      console.log("Aviso: Webhook recebido sem ID de pagamento. Ignorando...");
+      return res.sendStatus(200);
+    }
+
+    const paymentId = req.body.data.id;
+    console.log(`Buscando dados do pagamento ID: ${paymentId}...`);
+
+    // 2. Consulta a API do Mercado Pago
     const response = await axios.get(
       `https://api.mercadopago.com/v1/payments/${paymentId}`,
       {
@@ -77,17 +88,25 @@ app.post("/webhook", async (req, res) => {
     );
 
     const pagamento = response.data;
+    console.log(`Status do Pagamento ${paymentId}: ${pagamento.status}`);
 
+    // 3. Verifica se aprovou e tenta enviar o e-mail
     if (pagamento.status === "approved") {
+      console.log("Pagamento aprovado! Iniciando disparo de e-mail...");
+      
       await enviarEmail(
         pagamento.description,
         pagamento.transaction_amount
       );
+      
+      console.log("Função de e-mail executada sem erros!");
     }
 
+    // 4. Sempre devolve 200 pro Mercado Pago parar de insistir
     res.sendStatus(200);
   } catch (error) {
-    console.error(error);
+    // Mostra o erro exato que deu, se falhar
+    console.error("ERRO NO WEBHOOK:", error.response?.data || error.message);
     res.sendStatus(500);
   }
 });
@@ -115,4 +134,5 @@ async function enviarEmail(produto, valor) {
 app.listen(PORT, () => {
   console.log("Servidor rodando...");
 });
+
 
