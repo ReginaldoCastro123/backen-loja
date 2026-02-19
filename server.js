@@ -19,45 +19,60 @@ const PORT = process.env.PORT || 3000;
 // ==============================
 app.post("/criar-pagamento", async (req, res) => {
   try {
-    const { produto, valor, cep, envio } = req.body;
+    // 1. Recebendo todos os dados novos do seu site
+    const { 
+      produto, valor, envio, 
+      nome, celular, cep, rua, numero, complemento, bairro, cidade, estado 
+    } = req.body;
 
     const idempotencyKey = crypto.randomUUID();
 
-const response = await axios.post(
-  "https://api.mercadopago.com/v1/payments",
-  {
-    transaction_amount: Number(valor),
-    description: produto,
-    payment_method_id: "pix",
-    payer: {
-      email: "cliente@email.com"
-    },
-    notification_url: "https://backen-loja.onrender.com/webhook"
-  },
-  {
-    headers: {
-      Authorization: `Bearer ${process.env.MP_TOKEN}`,
-      "Content-Type": "application/json",
-      "X-Idempotency-Key": idempotencyKey
-    }
-  }
-);
-
+    const response = await axios.post(
+      "https://api.mercadopago.com/v1/payments",
+      {
+        transaction_amount: Number(valor),
+        description: produto,
+        payment_method_id: "pix",
+        payer: {
+          email: "cliente@email.com" // Pode deixar fixo se não quiser exigir e-mail do cliente na loja
+        },
+        notification_url: "https://backen-loja.onrender.com/webhook",
+        
+        // 2. Guardando TODOS os dados extras no Mercado Pago
+        metadata: {
+          cliente_nome: nome || "Não informado",
+          cliente_celular: celular || "Não informado",
+          cliente_cep: cep || "Não informado",
+          cliente_rua: rua || "Não informado",
+          cliente_numero: numero || "Não informado",
+          cliente_complemento: complemento || "",
+          cliente_bairro: bairro || "Não informado",
+          cliente_cidade: cidade || "Não informado",
+          cliente_estado: estado || "Não informado",
+          tipo_envio: envio || "Não informado"
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.MP_TOKEN}`,
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": idempotencyKey
+        }
+      }
+    );
 
     const pagamento = response.data;
-
     res.json({
       qr_code: pagamento.point_of_interaction.transaction_data.qr_code,
-      qr_code_base64:
-        pagamento.point_of_interaction.transaction_data.qr_code_base64
+      qr_code_base64: pagamento.point_of_interaction.transaction_data.qr_code_base64
     });
   } catch (error) {
-  console.log("ERRO:", error.response?.data || error.message);
-  res.status(500).json({
-    erro: "Erro ao criar pagamento",
-    detalhe: error.response?.data || error.message
-  });
-    }
+    console.log("ERRO:", error.response?.data || error.message);
+    res.status(500).json({
+      erro: "Erro ao criar pagamento",
+      detalhe: error.response?.data || error.message
+    });
+  }
 });
 
 // ==============================
@@ -94,9 +109,24 @@ app.post("/webhook", async (req, res) => {
     if (pagamento.status === "approved") {
       console.log("Pagamento aprovado! Iniciando disparo de e-mail...");
       
+      // Resgatando todas as informações do metadata
+      const dadosCliente = {
+        nome: pagamento.metadata?.cliente_nome,
+        celular: pagamento.metadata?.cliente_celular,
+        cep: pagamento.metadata?.cliente_cep,
+        rua: pagamento.metadata?.cliente_rua,
+        numero: pagamento.metadata?.cliente_numero,
+        complemento: pagamento.metadata?.cliente_complemento,
+        bairro: pagamento.metadata?.cliente_bairro,
+        cidade: pagamento.metadata?.cliente_cidade,
+        estado: pagamento.metadata?.cliente_estado,
+        envio: pagamento.metadata?.tipo_envio
+      };
+
       await enviarEmail(
         pagamento.description,
-        pagamento.transaction_amount
+        pagamento.transaction_amount,
+        dadosCliente // Mandamos o "pacote" todo de uma vez
       );
       
       console.log("Função de e-mail executada sem erros!");
@@ -114,19 +144,44 @@ app.post("/webhook", async (req, res) => {
 // ==============================
 // ENVIAR EMAIL (PLANO B - RESEND)
 // ==============================
-async function enviarEmail(produto, valor) {
+async function enviarEmail(produto, valor, cliente) {
   try {
     console.log("Conectando ao Resend (Rota anti-bloqueio do Render)...");
+
+    // Montando o texto do e-mail bem organizado
+    const textoEmail = `
+✅ OBA! UMA NOVA VENDA FOI APROVADA!
+
+📦 DETALHES DO PEDIDO
+-----------------------------------
+Produto: ${produto}
+Valor: R$ ${valor}
+Forma de Envio: ${cliente.envio}
+
+👤 DADOS DO COMPRADOR
+-----------------------------------
+Nome: ${cliente.nome}
+WhatsApp/Celular: ${cliente.celular}
+
+🚚 ENDEREÇO DE ENTREGA
+-----------------------------------
+Rua: ${cliente.rua}, Nº ${cliente.numero}
+Complemento: ${cliente.complemento}
+Bairro: ${cliente.bairro}
+Cidade/UF: ${cliente.cidade} - ${cliente.estado}
+CEP: ${cliente.cep}
+
+-----------------------------------
+Acesse o seu painel para preparar o envio!
+    `;
 
     const response = await axios.post(
       "https://api.resend.com/emails",
       {
-        // ATENÇÃO: No plano grátis, o "from" TEM QUE SER exatamente esse abaixo:
         from: "Notificacao Loja <onboarding@resend.dev>", 
-        // Aqui vai o SEU e-mail que receberá os avisos
         to: "farmafacil35@gmail.com", 
-        subject: "✅ Novo pedido pago!",
-        text: `Oba! Venda aprovada.\n\nProduto: ${produto}\nValor: R$ ${valor}`
+        subject: `✅ Pedido Pago: ${produto} (R$ ${valor})`, // Coloquei o nome do produto no título do e-mail!
+        text: textoEmail
       },
       {
         headers: {
@@ -139,7 +194,6 @@ async function enviarEmail(produto, valor) {
     console.log("E-mail enviado com sucesso via Resend! ID:", response.data.id);
     
   } catch (error) {
-    // Mostra exatamente o porquê falhou, se der erro
     console.error("ERRO GRAVE AO ENVIAR O E-MAIL (RESEND):", error.response?.data || error.message);
     throw error; 
   }
@@ -151,5 +205,6 @@ async function enviarEmail(produto, valor) {
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}...`);
 });
+
 
 
