@@ -3,6 +3,8 @@ import axios from "axios";
 import cors from "cors";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
+import crypto from "crypto";
+
 
 dotenv.config();
 
@@ -19,7 +21,9 @@ app.post("/criar-pagamento", async (req, res) => {
   try {
     const { produto, valor, cep, envio } = req.body;
 
-    const response = await axios.post(
+    const idempotencyKey = crypto.randomUUID();
+
+const response = await axios.post(
   "https://api.mercadopago.com/v1/payments",
   {
     transaction_amount: Number(valor),
@@ -33,10 +37,12 @@ app.post("/criar-pagamento", async (req, res) => {
   {
     headers: {
       Authorization: `Bearer ${process.env.MP_TOKEN}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "X-Idempotency-Key": idempotencyKey
     }
   }
 );
+
 
     const pagamento = response.data;
 
@@ -109,3 +115,4 @@ async function enviarEmail(produto, valor) {
 app.listen(PORT, () => {
   console.log("Servidor rodando...");
 });
+
